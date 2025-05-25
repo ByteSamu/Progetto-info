@@ -1,4 +1,4 @@
-// app.js
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
 import { 
   getAuth, 
@@ -18,7 +18,6 @@ import {
   query, 
   where 
 } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
-
 const firebaseConfig = {
   apiKey: "AIzaSyDspr_Tjfid--8lskePSiDtB_9X1Sq2L10",
   authDomain: "pokeinfo-910e5.firebaseapp.com",
@@ -27,12 +26,9 @@ const firebaseConfig = {
   messagingSenderId: "100362273506",
   appId: "1:100362273506:web:349f60c6f13bc2a88b54bb"
 };
-
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// Rendi disponibili globalmente
 window.firebaseApp = app;
 window.firebaseAuth = auth;
 window.firebaseDb = db;
@@ -48,28 +44,17 @@ window.getDocs = getDocs;
 window.deleteDoc = deleteDoc;
 window.query = query;
 window.where = where;
-
-// Creiamo la nostra applicazione Vue
 new Vue({
   el: '#app',
   data: {
-    // Array che conterrà tutti i Pokémon caricati
     pokemon: [],
-    // Array che conterrà i Pokémon filtrati in base alla generazione selezionata
     filteredPokemon: [],
-    // Termine di ricerca inserito dall'utente
     searchTerm: '',
-    // Generazione attualmente selezionata (0 = tutte)
     selectedGeneration: 0,
-    // Pagina corrente nella paginazione
     currentPage: 1,
-    // Numero di Pokémon per pagina
     itemsPerPage: 20,
-    // Flag per indicare il caricamento dei dati
     loading: true,
-    // Array per memorizzare i Pokémon preferiti
     favorites: [],
-    // Definizione delle generazioni
     generations: [
       { id: 0, name: 'Tutte', range: [1, 1010] },
       { id: 1, name: 'Gen 1', range: [1, 151] },
@@ -82,19 +67,12 @@ new Vue({
       { id: 8, name: 'Gen 8', range: [810, 905] },
       { id: 9, name: 'Gen 9', range: [906, 1010] }
     ],
-    // Pokémon selezionato per i dettagli
     selectedPokemon: null,
-    // Flag per indicare se la modal dei dettagli è aperta
     showDetails: false,
-    // Dati dettagliati del Pokémon selezionato
     pokemonDetails: null,
-    // Flag per indicare il caricamento dei dettagli
     loadingDetails: false,
-    // Indica se siamo nella vista preferiti
     showFavorites: false,
-    // Flag per indicare il caricamento dei preferiti dal database
     loadingFavorites: false,
-    
     isLoggedIn: false,
     showLoginModal: false,
     showRegisterForm: false,
@@ -114,25 +92,19 @@ new Vue({
     registerSuccess: '',
     currentUser: null,
   },
-
   computed: {
-    // Calcola il numero totale di pagine in base ai Pokémon filtrati
     totalPages() {
       return Math.ceil(this.filteredPokemon.length / this.itemsPerPage);
     },
-    // Calcola quali Pokémon mostrare nella pagina corrente
     paginatedPokemon() {
       const startIndex = (this.currentPage - 1) * this.itemsPerPage;
       const endIndex = startIndex + this.itemsPerPage;
       return this.filteredPokemon.slice(startIndex, endIndex);
     },
-    // Genera un array di numeri di pagina per la navigazione
     displayedPages() {
       const pages = [];
       let startPage = Math.max(1, this.currentPage - 2);
       let endPage = Math.min(this.totalPages, this.currentPage + 2);
-      
-      // Assicuriamoci di mostrare sempre 5 pagine se possibile
       if (endPage - startPage < 4) {
         if (startPage === 1) {
           endPage = Math.min(5, this.totalPages);
@@ -140,14 +112,11 @@ new Vue({
           startPage = Math.max(1, this.totalPages - 4);
         }
       }
-      
       for (let i = startPage; i <= endPage; i++) {
         pages.push(i);
       }
-      
       return pages;
     },
-    // Calcola il colore dell'indicatore della statistica in base al valore
     statColor() {
       return function(value) {
         if (value < 50) return 'bg-danger';
@@ -156,33 +125,22 @@ new Vue({
         return 'bg-success';
       };
     },
-    // Ottiene i Pokémon preferiti completi di dati
     favoritePokemon() {
-      // Filtra i Pokémon che sono nei preferiti
       return this.pokemon.filter(pokemon => this.favorites.includes(pokemon.id));
     },
-    
     userId() {
       return this.currentUser ? this.currentUser.id : null;
     }
-
-
   },
-
   methods: {
-    // Carica i dati dei Pokémon dall'API
     async fetchPokemon() {
       this.loading = true;
       try {
-        // Carichiamo i primi 1010 Pokémon (fino alla 9a generazione)
         const response = await axios.get('https://pokeapi.co/api/v2/pokemon?limit=1010');
         const results = response.data.results;
-        
-        // Per ogni Pokémon, carichiamo i dettagli
         this.pokemon = await Promise.all(results.map(async (pokemon, index) => {
           const detailResponse = await axios.get(pokemon.url);
           const data = detailResponse.data;
-          
           return {
             id: data.id,
             name: data.name.charAt(0).toUpperCase() + data.name.slice(1),
@@ -203,11 +161,7 @@ new Vue({
             apiUrl: pokemon.url
           };
         }));
-        
-        // Carica i preferiti dal database
         await this.loadFavoritesFromDatabase();
-        
-        // Filtra i Pokémon in base alla generazione selezionata
         this.filterByGeneration();
       } catch (error) {
         console.error('Errore nel caricamento dei Pokémon:', error);
@@ -215,88 +169,59 @@ new Vue({
         this.loading = false;
       }
     },
-    
-    // Filtra i Pokémon in base alla generazione selezionata
     filterByGeneration() {
       const generation = this.generations.find(gen => gen.id === this.selectedGeneration);
-      
       if (generation.id === 0) {
-        // Se è selezionata "Tutte le generazioni"
         this.filteredPokemon = [...this.pokemon];
       } else {
-        // Filtra per la generazione specifica
         this.filteredPokemon = this.pokemon.filter(pokemon => 
           pokemon.id >= generation.range[0] && pokemon.id <= generation.range[1]
         );
       }
-      
-      // Applica il filtro di ricerca se presente
       if (this.searchTerm.trim() !== '') {
         this.filteredPokemon = this.filteredPokemon.filter(pokemon => 
           pokemon.name.toLowerCase().includes(this.searchTerm.toLowerCase()) ||
           pokemon.id.toString() === this.searchTerm
         );
       }
-      
-      // Reimposta la pagina corrente a 1 dopo il filtraggio
       this.currentPage = 1;
     },
-    
-    // Gestisce la selezione di una generazione
     selectGeneration(genId) {
       this.selectedGeneration = genId;
       this.filterByGeneration();
     },
-    
-    // Gestisce la ricerca dei Pokémon
     handleSearch() {
       this.filterByGeneration();
     },
-    
-    // Naviga a una pagina specifica
     goToPage(page) {
       if (page < 1 || page > this.totalPages) return;
       this.currentPage = page;
-      // Scroll alla parte superiore dell'elenco dei Pokémon
       this.$nextTick(() => {
         document.getElementById('pokemon-list').scrollIntoView({ behavior: 'smooth' });
       });
     },
-    
-    // Aggiunge o rimuove un Pokémon dai preferiti
     async toggleFavorite(pokemonId) {
       const index = this.favorites.indexOf(pokemonId);
       if (index === -1) {
-        // Aggiungi ai preferiti
         this.favorites.push(pokemonId);
         await this.saveFavoriteToDatabase(pokemonId);
       } else {
-        // Rimuovi dai preferiti
         this.favorites.splice(index, 1);
         await this.removeFavoriteFromDatabase(pokemonId);
       }
     },
-    
-    // Controlla se un Pokémon è tra i preferiti
     isFavorite(pokemonId) {
       return this.favorites.includes(pokemonId);
     },
-    
-    // Carica i preferiti dal localStorage (metodo deprecato, manteniamo per compatibilità)
     loadFavorites() {
       const savedFavorites = localStorage.getItem('pokemonFavorites');
       if (savedFavorites) {
         this.favorites = JSON.parse(savedFavorites);
       }
     },
-    
-    // Carica i preferiti dal database
     async loadFavoritesFromDatabase() {
       this.loadingFavorites = true;
       try {
-        // Qui dovremmo fare una chiamata al nostro database
-        // Per esempio utilizzando Firebase, MySQL con PHP, ecc.
-        // Esempio con fetch API:
         const response = await fetch(`/api/favorites?userId=${this.userId}`);
         if (response.ok) {
           const data = await response.json();
@@ -304,17 +229,13 @@ new Vue({
         }
       } catch (error) {
         console.error('Errore nel caricamento dei preferiti dal database:', error);
-        // Fallback al localStorage in caso di errore
         this.loadFavorites();
       } finally {
         this.loadingFavorites = false;
       }
     },
-    
-    // Salva un preferito nel database
     async saveFavoriteToDatabase(pokemonId) {
       try {
-        // Esempio di chiamata POST al database
         await fetch('/api/favorites', {
           method: 'POST',
           headers: {
@@ -327,85 +248,57 @@ new Vue({
         });
       } catch (error) {
         console.error('Errore nel salvataggio del preferito:', error);
-        // Fallback al localStorage in caso di errore
         localStorage.setItem('pokemonFavorites', JSON.stringify(this.favorites));
       }
     },
-    
-    // Rimuove un preferito dal database
     async removeFavoriteFromDatabase(pokemonId) {
       try {
-        // Esempio di chiamata DELETE al database
         await fetch(`/api/favorites/${this.userId}/${pokemonId}`, {
           method: 'DELETE'
         });
       } catch (error) {
         console.error('Errore nella rimozione del preferito:', error);
-        // Fallback al localStorage in caso di errore
         localStorage.setItem('pokemonFavorites', JSON.stringify(this.favorites));
       }
     },
-    
-    // Apre la modal con i dettagli del Pokémon
     showPokemonDetails(pokemon) {
       this.selectedPokemon = pokemon;
       this.loadPokemonDetails(pokemon);
       this.showDetails = true;
     },
-    
-    // Chiude la modal dei dettagli
     closeDetails() {
       this.showDetails = false;
       this.selectedPokemon = null;
       this.pokemonDetails = null;
     },
-    
-    // Naviga alla sezione preferiti
     showFavoritesPage() {
       this.showFavorites = true;
       this.filteredPokemon = this.favoritePokemon;
       this.currentPage = 1;
     },
-    
-    // Naviga alla home
     showHomePage() {
       this.showFavorites = false;
       this.filterByGeneration();
     },
-    
-    // Carica i dettagli completi di un Pokémon
     async loadPokemonDetails(pokemon) {
       if (!pokemon) return;
-      
       this.loadingDetails = true;
       try {
-        // Usiamo l'URL già salvato per evitare di fare una nuova richiesta di ricerca
         const response = await axios.get(pokemon.apiUrl);
         const data = response.data;
-        
-        // Otteniamo la descrizione dalla specie
         const speciesResponse = await axios.get(data.species.url);
-        
-        // Cerchiamo una descrizione in italiano o in inglese
         let description = '';
         const flavorTexts = speciesResponse.data.flavor_text_entries;
-        
-        // Prima cerchiamo in italiano
         const italianText = flavorTexts.find(entry => entry.language.name === 'it');
         if (italianText) {
           description = italianText.flavor_text;
         } else {
-          // Se non c'è in italiano, usiamo l'inglese
           const englishText = flavorTexts.find(entry => entry.language.name === 'en');
           if (englishText) {
             description = englishText.flavor_text;
           }
         }
-        
-        // Puliamo il testo dalla descrizione (rimuove i caratteri di nuova riga)
         description = description.replace(/[\n\f]/g, ' ');
-        
-        // Prepariamo i dati dettagliati
         this.pokemonDetails = {
           id: data.id,
           name: pokemon.name,
@@ -425,75 +318,54 @@ new Vue({
           ],
           baseExperience: data.base_experience
         };
-        
       } catch (error) {
         console.error('Errore nel caricamento dei dettagli del Pokémon:', error);
       } finally {
         this.loadingDetails = false;
       }
     },
-    
-    // Calcola la percentuale di una statistica (per la visualizzazione delle barre)
     calculateStatPercentage(value) {
-      // 255 è il valore massimo possibile per una statistica Pokémon
       return Math.min(100, Math.round((value / 255) * 100));
     },
-
     showLogin() {
       this.loginError = '';
       this.showLoginModal = true;
       this.showRegisterForm = false;
     },
-    
     showRegister() {
       this.registerError = '';
       this.registerSuccess = '';
       this.showRegisterForm = true;
     },
-    
     closeLoginModal() {
       this.showLoginModal = false;
       this.loginError = '';
       this.registerError = '';
       this.registerSuccess = '';
     },
-    
     async login() {
       this.loginError = '';
-      
-      // Validazione
       if (!this.loginData.email || !this.loginData.password) {
         this.loginError = 'Per favore, inserisci email e password';
         return;
       }
-      
       try {
-        // Autenticazione con Firebase
         const userCredential = await signInWithEmailAndPassword(
           firebaseAuth, 
           this.loginData.email, 
           this.loginData.password
         );
-        
-        // Utente autenticato
         this.isLoggedIn = true;
         this.currentUser = {
           id: userCredential.user.uid,
           name: this.loginData.email.split('@')[0],
           email: this.loginData.email
         };
-        
-        // Salva i dati utente se "ricordami" è attivo
         if (this.loginData.rememberMe) {
           localStorage.setItem('pokedexUser', JSON.stringify(this.currentUser));
         }
-        
-        // Carica i preferiti dell'utente da Firebase
         await this.loadFavoritesFromDatabase();
-        
-        // Chiudi il modal
         this.closeLoginModal();
-        
       } catch (error) {
         console.error('Errore durante il login:', error);
         if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
@@ -503,52 +375,38 @@ new Vue({
         }
       }
     },
-    
     async register() {
       this.registerError = '';
       this.registerSuccess = '';
-      
-      // Validazione
       if (!this.registerData.name || !this.registerData.email || !this.registerData.password) {
         this.registerError = 'Tutti i campi sono obbligatori';
         return;
       }
-      
       if (this.registerData.password !== this.registerData.confirmPassword) {
         this.registerError = 'Le password non corrispondono';
         return;
       }
-      
       try {
-        // Registrazione con Firebase
         const userCredential = await createUserWithEmailAndPassword(
           firebaseAuth, 
           this.registerData.email, 
           this.registerData.password
         );
-        
-        // Salva il profilo utente nel database
         await setDoc(doc(db, "users", userCredential.user.uid), {
           name: this.registerData.name,
           email: this.registerData.email,
           createdAt: new Date().toISOString()
         });
-        
         this.registerSuccess = 'Registrazione avvenuta con successo! Ora puoi accedere con le tue credenziali.';
-        
-        // Reset form dati
         this.registerData = {
           name: '',
           email: '',
           password: '',
           confirmPassword: ''
         };
-        
-        // Torna al form di login dopo 2 secondi
         setTimeout(() => {
           this.showRegisterForm = false;
         }, 2000);
-        
       } catch (error) {
         console.error('Errore durante la registrazione:', error);
         if (error.code === 'auth/email-already-in-use') {
@@ -560,7 +418,6 @@ new Vue({
         }
       }
     },
-    
     async logout() {
       try {
         await signOut(firebaseAuth);
@@ -568,31 +425,22 @@ new Vue({
         this.currentUser = null;
         this.favorites = [];
         localStorage.removeItem('pokedexUser');
-        // Reimposta la vista alla home
         this.showHomePage();
       } catch (error) {
         console.error('Errore durante il logout:', error);
       }
     },
-    
     async loadFavoritesFromDatabase() {
-      // Se l'utente non è loggato, non caricare i preferiti
       if (!this.userId) {
         this.favorites = [];
         return;
       }
-      
       this.loadingFavorites = true;
       try {
-        // Recupera i preferiti da Firestore
         const favoritesRef = collection(db, "favorites");
         const q = query(favoritesRef, where("userId", "==", this.userId));
         const querySnapshot = await getDocs(q);
-        
-        // Resetta i preferiti
         this.favorites = [];
-        
-        // Aggiungi i preferiti trovati
         querySnapshot.forEach((doc) => {
           this.favorites.push(doc.data().pokemonId);
         });
@@ -604,14 +452,11 @@ new Vue({
       }
     },
     async saveFavoriteToDatabase(pokemonId) {
-      // Se l'utente non è loggato, mostra il form di login
       if (!this.isLoggedIn) {
         this.showLogin();
         return;
       }
-      
       try {
-        // Aggiungi alla collezione 'favorites'
         await addDoc(collection(db, "favorites"), {
           userId: this.userId,
           pokemonId: pokemonId,
@@ -619,17 +464,14 @@ new Vue({
         });
       } catch (error) {
         console.error('Errore nel salvataggio del preferito:', error);
-        // Rimuovi dai preferiti locali in caso di errore
         const index = this.favorites.indexOf(pokemonId);
         if (index !== -1) {
           this.favorites.splice(index, 1);
         }
       }
     },
-    
     async removeFavoriteFromDatabase(pokemonId) {
       try {
-        // Cerca il documento da eliminare
         const favoritesRef = collection(db, "favorites");
         const q = query(
           favoritesRef, 
@@ -637,42 +479,31 @@ new Vue({
           where("pokemonId", "==", pokemonId)
         );
         const querySnapshot = await getDocs(q);
-        
-        // Elimina i documenti trovati
         querySnapshot.forEach(async (document) => {
           await deleteDoc(doc(db, "favorites", document.id));
         });
       } catch (error) {
         console.error('Errore nella rimozione del preferito:', error);
-        // Aggiungi di nuovo ai preferiti locali in caso di errore
         if (!this.favorites.includes(pokemonId)) {
           this.favorites.push(pokemonId);
         }
       }
     },
-
-
     async toggleFavorite(pokemonId) {
-      // Se l'utente non è loggato, mostra il modal di login
       if (!this.isLoggedIn) {
         this.showLogin();
         return;
       }
-    
       const index = this.favorites.indexOf(pokemonId);
       if (index === -1) {
-        // Aggiungi ai preferiti
         this.favorites.push(pokemonId);
         await this.saveFavoriteToDatabase(pokemonId);
       } else {
-        // Rimuovi dai preferiti
         this.favorites.splice(index, 1);
         await this.removeFavoriteFromDatabase(pokemonId);
       }
     },
-
 }, 
-  // Struttura HTML del template Vue
   template: `
     <div>
       <!-- Navbar -->
@@ -716,7 +547,6 @@ new Vue({
           </div>
         </div>
       </nav>
-
       <!-- Contenuto principale -->
       <div class="container">
         <!-- Barra di ricerca -->
@@ -738,7 +568,6 @@ new Vue({
               </div>
             </div>
           </div>
-          
           <!-- Filtri generazione (visibili solo nella home) -->
           <div v-if="!showFavorites" class="text-center mt-3">
             <span 
@@ -752,26 +581,22 @@ new Vue({
             </span>
           </div>
         </div>
-        
         <!-- Messaggio di caricamento dei preferiti -->
         <div v-if="loadingFavorites" class="alert alert-info text-center">
           Caricamento dei preferiti in corso...
         </div>
-
         <!-- Loading spinner -->
         <div v-if="loading" class="spinner-container">
           <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Loading...</span>
           </div>
         </div>
-
         <!-- Lista Pokémon -->
         <div v-else id="pokemon-list">
           <div v-if="filteredPokemon.length === 0" class="alert alert-info text-center">
             <span v-if="showFavorites">Non hai ancora aggiunto Pokémon ai preferiti.</span>
             <span v-else>Nessun Pokémon trovato con questi criteri di ricerca.</span>
           </div>
-          
           <div class="row">
             <div class="col-12 mb-3">
               <h2 class="mb-0" v-if="!showFavorites">
@@ -783,7 +608,6 @@ new Vue({
                 <small class="text-muted">{{ filteredPokemon.length }} Pokémon</small>
               </h2>
             </div>
-
             <div v-for="pokemon in paginatedPokemon" :key="pokemon.id" class="col-md-6 col-lg-3">
               <div class="card pokemon-card">
                 <div class="pokemon-img-container">
@@ -816,7 +640,6 @@ new Vue({
               </div>
             </div>
           </div>
-
           <!-- Paginazione -->
           <nav v-if="totalPages > 1" aria-label="Pagine Pokémon">
             <ul class="pagination">
@@ -830,14 +653,12 @@ new Vue({
                   <i class="fas fa-angle-left"></i>
                 </a>
               </li>
-              
               <li v-if="displayedPages[0] > 1" class="page-item">
                 <a class="page-link" href="#" @click.prevent="goToPage(1)">1</a>
               </li>
               <li v-if="displayedPages[0] > 2" class="page-item disabled">
                 <span class="page-link">...</span>
               </li>
-              
               <li 
                 v-for="page in displayedPages"
                 :key="page"
@@ -846,14 +667,12 @@ new Vue({
               >
                 <a class="page-link" href="#" @click.prevent="goToPage(page)">{{ page }}</a>
               </li>
-              
               <li v-if="displayedPages[displayedPages.length - 1] < totalPages - 1" class="page-item disabled">
                 <span class="page-link">...</span>
               </li>
               <li v-if="displayedPages[displayedPages.length - 1] < totalPages" class="page-item">
                 <a class="page-link" href="#" @click.prevent="goToPage(totalPages)">{{ totalPages }}</a>
               </li>
-              
               <li class="page-item" :class="{ disabled: currentPage === totalPages }">
                 <a class="page-link" href="#" @click.prevent="goToPage(currentPage + 1)">
                   <i class="fas fa-angle-right"></i>
@@ -880,53 +699,43 @@ new Vue({
       <!-- Form Login -->
       <form v-if="!showRegisterForm" @submit.prevent="login">
         <div v-if="loginError" class="alert alert-danger">{{ loginError }}</div>
-        
         <div class="mb-3">
           <label for="loginEmail" class="form-label">Email</label>
           <input type="email" class="form-control" id="loginEmail" v-model="loginData.email" required>
         </div>
-        
         <div class="mb-3">
           <label for="loginPassword" class="form-label">Password</label>
           <input type="password" class="form-control" id="loginPassword" v-model="loginData.password" required>
         </div>
-        
         <div class="mb-3 form-check">
           <input type="checkbox" class="form-check-input" id="rememberMe" v-model="loginData.rememberMe">
           <label class="form-check-label" for="rememberMe">Ricordami</label>
         </div>
-        
         <div class="d-grid gap-2">
           <button type="submit" class="btn btn-primary">Accedi</button>
           <button type="button" class="btn btn-outline-secondary" @click="showRegister">Non hai un account? Registrati</button>
         </div>
       </form>
-      
       <!-- Form Registrazione -->
       <form v-else @submit.prevent="register">
         <div v-if="registerError" class="alert alert-danger">{{ registerError }}</div>
         <div v-if="registerSuccess" class="alert alert-success">{{ registerSuccess }}</div>
-        
         <div class="mb-3">
           <label for="registerName" class="form-label">Nome</label>
           <input type="text" class="form-control" id="registerName" v-model="registerData.name" required>
         </div>
-        
         <div class="mb-3">
           <label for="registerEmail" class="form-label">Email</label>
           <input type="email" class="form-control" id="registerEmail" v-model="registerData.email" required>
         </div>
-        
         <div class="mb-3">
           <label for="registerPassword" class="form-label">Password</label>
           <input type="password" class="form-control" id="registerPassword" v-model="registerData.password" required>
         </div>
-        
         <div class="mb-3">
           <label for="confirmPassword" class="form-label">Conferma Password</label>
           <input type="password" class="form-control" id="confirmPassword" v-model="registerData.confirmPassword" required>
         </div>
-        
         <div class="d-grid gap-2">
           <button type="submit" class="btn btn-primary">Registrati</button>
           <button type="button" class="btn btn-outline-secondary" @click="showRegisterForm = false">Hai già un account? Accedi</button>
@@ -939,7 +748,6 @@ new Vue({
 <!-- Backdrop per il modal -->
 <div v-if="showLoginModal" class="modal-backdrop fade show"></div>
       </div>
-      
       <!-- Modal per i dettagli del Pokémon -->
       <div class="modal fade" :class="{ show: showDetails }" :style="{ display: showDetails ? 'block' : 'none' }" tabindex="-1" role="dialog" aria-labelledby="pokemonDetailsModal">
         <div class="modal-dialog modal-lg" role="document">
@@ -950,7 +758,6 @@ new Vue({
                 <span class="visually-hidden">Loading...</span>
               </div>
             </div>
-            
             <!-- Contenuto dei dettagli -->
             <div v-else-if="pokemonDetails">
               <div class="modal-header">
@@ -998,7 +805,6 @@ new Vue({
                       </div>
                     </div>
                   </div>
-                  
                   <!-- Descrizione e statistiche -->
                   <div class="col-md-7">
                     <div class="card mb-3">
@@ -1009,7 +815,6 @@ new Vue({
                         <p>{{ pokemonDetails.description || 'Nessuna descrizione disponibile.' }}</p>
                       </div>
                     </div>
-                    
                     <div class="card">
                       <div class="card-header">
                         <h6 class="mb-0">Statistiche base</h6>
@@ -1056,10 +861,8 @@ new Vue({
           </div>
         </div>
       </div>
-      
       <!-- Backdrop per la modal -->
       <div v-if="showDetails" class="modal-backdrop fade show"></div>
-
       <!-- Footer -->
       <footer class="py-3 mt-5 bg-light">
         <div class="container text-center">
@@ -1068,9 +871,9 @@ new Vue({
       </footer>
     </div>
   `,
-  // Inizializza l'applicazione caricando i dati dei Pokémon
   mounted() {
     this.fetchPokemon();
     this.checkLoggedInUser();
   }
 });
+  
