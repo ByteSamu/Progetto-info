@@ -213,12 +213,7 @@ new Vue({
     isFavorite(pokemonId) {
       return this.favorites.includes(pokemonId);
     },
-    loadFavorites() {
-      const savedFavorites = localStorage.getItem('pokemonFavorites');
-      if (savedFavorites) {
-        this.favorites = JSON.parse(savedFavorites);
-      }
-    },
+    
     async loadFavoritesFromDatabase() {
       this.loadingFavorites = true;
       try {
